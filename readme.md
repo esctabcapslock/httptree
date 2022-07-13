@@ -1,6 +1,7 @@
 <div align="center">
 
 # httptree 🌲
+[![npm](https://img.shields.io/npm/v/httptree.svg)](https://www.npmjs.com/package/httptree)
 Web framework to make [http] and [https] modules easier to use
 </div>
 
@@ -13,7 +14,7 @@ Web framework to make [http] and [https] modules easier to use
 - A small example of running a server ([also check this](./example/example.js))
 ```js
 //@ts-check
-const httptree = require('../build')
+const httptree = require('httptree')
 const http = require('http')
 // creage httptree module
 const hp = new httptree.Server() 

@@ -12,7 +12,8 @@
     "type": "git",
     "url": "https://github.com/esctabcapslock/httptree"
   },
-  "dependencies": {
+  "homepage": "https://github.com/esctabcapslock/httptree",
+  "devDependencies": {
     "@types/node": "^18.0.3"
   }
 }

@@ -1,5 +1,5 @@
 //@ts-check
-const httptree = require('../build')
+const httptree = require('../lib')
 const http = require('http')
 // creage httptree module
 const hp = new httptree.Server() 
