@@ -91,13 +91,13 @@ export class HttptreePath<T>{
                     const json = JSON.parse((data).toString())
                     fn(HTreq, HTres, json, option)
                 }catch(e){
-                    httpError(400, res, 'request body is wrong'+req.url, true)
+                    httpError(400, res, 'request body is wrong'+e+req.url, 'request body is wrong'+req.url)
                 }
             }
 
             if(this.postFn && method=='post') wrapfn(this.postFn)
-            else if(this.putFn && method=='post') wrapfn(this.putFn)
-            else if(this.deleteFn && method=='post') wrapfn(this.deleteFn)
+            else if(this.putFn && method=='put') wrapfn(this.putFn)
+            else if(this.deleteFn && method=='delete') wrapfn(this.deleteFn)
             else if(this.methodFns[method]) wrapfn(this.methodFns[method])
             else return false
             return true
@@ -127,21 +127,25 @@ export class HttptreePath<T>{
         return $$
     }
 
-    protected printpathStructure(dt:string){
+    protected printpathStructure(dt:string,end:boolean=true){
         const tab = '   '
-        const hd = '│ '
-        const bt = '│•'
+        const hd = end?'  ':'│ '
+        const bt = '•'
+        const endchr = end?'└─':'├─'
         //const dt = (new Array(d)).fill(tab).join('')
-        console.log(dt+'├─',`${"\x1b[32m"}"${this.subpath}"${"\x1b[0m"}`)
-        if(this.getFn) console.log(dt+hd+tab+bt,'get',this.getFn)
-        if(this.headFn) console.log(dt+hd+tab+bt,'head',this.headFn)
-        if(this.postFn) console.log(dt+hd+tab+bt,'post',this.postFn)
-        if(this.putFn) console.log(dt+hd+tab+bt,'put',this.putFn)
-        if(this.deleteFn) console.log(dt+hd+tab+bt,'delete',this.deleteFn)
-        for(const method in this.methodFns) console.log(dt+hd+tab+bt,`${method}:`,this.methodFns[method])
-        for(const subpath in this.subpathList){
-            const {r,p} = this.subpathList[subpath]
-            p.printpathStructure(dt+hd+tab)
+        console.log(dt+endchr+`${"\x1b[32m"}"${this.subpath}"${"\x1b[0m"}`)
+        if(this.getFn) console.log(dt+hd+bt,'get',this.getFn)
+        if(this.headFn) console.log(dt+hd+bt,'head',this.headFn)
+        if(this.postFn) console.log(dt+hd+bt,'post',this.postFn)
+        if(this.putFn) console.log(dt+hd+bt,'put',this.putFn)
+        if(this.deleteFn) console.log(dt+hd+bt,'delete',this.deleteFn)
+        for(const method in this.methodFns) console.log(dt+hd+bt,`${method}:`,this.methodFns[method])
+        const keyList = []
+        for(const subpath in this.subpathList) keyList.push(subpath)
+        for(let i=0; i<keyList.length; i++){
+            const {r,p} = this.subpathList[keyList[i]]
+            p.printpathStructure(dt+hd,i==(keyList.length-1))
+            
         }
     }
 }
@@ -163,7 +167,7 @@ export class Server<T> extends HttptreePath<T>{
 
     public printStructure(){
         console.log('httptree structure')
-        this.printpathStructure('')
+        this.printpathStructure('',true)
     }
 }
 
@@ -200,4 +204,4 @@ export const addon = {
 
 }
 
-export {httpError}
+export {httpError,HtServerResponse,HtIncomingMessage}

@@ -33,6 +33,8 @@ hp.path('index.html').get((req,res,data,obj)=>{
     console.log('res index.html',res.statusCode, data)
     res.sendFile(__dirname+'\\index.html')
 })
+
+console.log('this structure:',hp.printStructure())
 http.createServer((req,res)=>{ 
     console.log('req:',req.url)
 
@@ -41,7 +43,7 @@ http.createServer((req,res)=>{
 
     // httptree.httpError is simple http error handler
     httptree.httpError(404,res,'not file')
-    
+
 }).listen(port,()=>console.log('server port:',port))
 ```
 

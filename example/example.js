@@ -19,7 +19,6 @@ hp.path('index.html').get((req,res,data,obj)=>{
     res.sendFile(__dirname+'\\index.html')
 })
 
-
 console.log('this structure:',hp.printStructure())
 http.createServer((req,res)=>{ 
     console.log('req:',req.url)

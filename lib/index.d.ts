@@ -23,7 +23,7 @@ export declare class HttptreePath<T> {
     method(methodName: string, callback: HttptreePathCallback<T>): void;
     protected propagation(req: IncomingMessage, res: ServerResponse, option: T, pathName: string): boolean;
     private copy;
-    protected printpathStructure(dt: string): void;
+    protected printpathStructure(dt: string, end?: boolean): void;
 }
 export declare class Server<T> extends HttptreePath<T> {
     constructor();
@@ -37,4 +37,4 @@ export declare const addon: {
     };
     rmStrangeStr: (str: string) => string;
 };
-export { httpError };
+export { httpError, HtServerResponse, HtIncomingMessage };
