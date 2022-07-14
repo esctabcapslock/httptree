@@ -1,5 +1,6 @@
 /// <reference types="node" />
-import { ServerResponse, IncomingMessage, OutgoingHttpHeaders, IncomingHttpHeaders, OutgoingHttpHeader } from "http";
+import { ServerResponse, IncomingMessage } from "http";
+import { HtIncomingMessage, HtServerResponse, httpError } from "./message";
 declare type HttptreePathCallback<T> = (req: HtIncomingMessage, res: HtServerResponse, data: any, option: T) => any;
 export declare class HttptreePath<T> {
     protected subpath: string;
@@ -22,41 +23,13 @@ export declare class HttptreePath<T> {
     method(methodName: string, callback: HttptreePathCallback<T>): void;
     protected propagation(req: IncomingMessage, res: ServerResponse, option: T, pathName: string): boolean;
     private copy;
+    protected printpathStructure(dt: string): void;
 }
 export declare class Server<T> extends HttptreePath<T> {
     constructor();
     parse(req: IncomingMessage, res: ServerResponse, option: T): boolean;
+    printStructure(): void;
 }
-export declare class HtIncomingMessage {
-    private req;
-    private __url;
-    constructor(req: IncomingMessage);
-    get complete(): boolean;
-    destroy(error?: Error | undefined): IncomingMessage;
-    get headers(): IncomingHttpHeaders;
-    get url(): string;
-    get method(): string;
-    get httpVersion(): string;
-    get rawHeaders(): string[];
-}
-export declare class HtServerResponse {
-    private req;
-    private res;
-    constructor(req: IncomingMessage, res: ServerResponse);
-    writeHead(statusCode: number, statusMessage?: string | undefined, headers?: OutgoingHttpHeaders | OutgoingHttpHeader[] | undefined): this;
-    writeHead(statusCode: number, headers?: OutgoingHttpHeaders | OutgoingHttpHeader[] | undefined): this;
-    setHeader(name: string, value: string | number | readonly string[]): this;
-    set statusCode(statusCode: number);
-    get statusCode(): number;
-    getHeader(name: string): string | number | string[] | undefined;
-    removeHeader(name: string): void;
-    set statusMessage(msg: string);
-    send(data: Buffer | string | object): void;
-    sendFile(filepath: string): void;
-    throw(statusCode: number, msg: string, userMsg: string | boolean): void;
-}
-export declare function httpError(statusCode: number, res: HtServerResponse, consoleMsg: any, userMsg?: string | boolean): boolean;
-export declare function httpError(statusCode: number, res: ServerResponse, consoleMsg: any, userMsg?: string | boolean): boolean;
 export declare const addon: {
     parseCookie: (ar: string[] | undefined | string) => {
         [key: string]: string;
@@ -64,4 +37,4 @@ export declare const addon: {
     };
     rmStrangeStr: (str: string) => string;
 };
-export {};
+export { httpError };
