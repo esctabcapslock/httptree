@@ -1,6 +1,6 @@
 {
   "name": "httptree",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Web framework to make http modules easier to use",
   "main": "index.js",
   "scripts": {

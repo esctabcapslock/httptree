@@ -20,7 +20,7 @@ export async function sendFile(res:ServerResponse,pathname:string,range:string|u
 
         if (!parts || parts.length != 2 || isNaN(parts[0]) || parts[0] < 0) {
             res.setHeader('Content-Type', file_type)
-            res.setHeader('Content-Length',  'stats.size')
+            res.setHeader('Content-Length',  stats.size)
             res.setHeader('Accept-Ranges', 'bytes')
             const readStream = createReadStream(pathname)
             readStream.pipe(res);

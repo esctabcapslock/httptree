@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { ServerResponse, IncomingMessage, OutgoingHttpHeaders, IncomingHttpHeaders, OutgoingHttpHeader } from "http";
-declare type HttptreePathCallback<T> = ($$: HttptreePath<T>, req: HtIncomingMessage, res: HtServerResponse, data: object, option: T) => any;
+declare type HttptreePathCallback<T> = (req: HtIncomingMessage, res: HtServerResponse, data: any, option: T) => any;
 export declare class HttptreePath<T> {
     protected subpath: string;
     protected showerror: boolean;
@@ -21,6 +21,7 @@ export declare class HttptreePath<T> {
     delete(callback: HttptreePathCallback<T>): void;
     method(methodName: string, callback: HttptreePathCallback<T>): void;
     protected propagation(req: IncomingMessage, res: ServerResponse, option: T, pathName: string): boolean;
+    private copy;
 }
 export declare class Server<T> extends HttptreePath<T> {
     constructor();
@@ -46,16 +47,20 @@ export declare class HtServerResponse {
     writeHead(statusCode: number, headers?: OutgoingHttpHeaders | OutgoingHttpHeader[] | undefined): this;
     setHeader(name: string, value: string | number | readonly string[]): this;
     set statusCode(statusCode: number);
+    get statusCode(): number;
     getHeader(name: string): string | number | string[] | undefined;
     removeHeader(name: string): void;
     set statusMessage(msg: string);
     send(data: Buffer | string | object): void;
     sendFile(filepath: string): void;
+    throw(statusCode: number, msg: string, userMsg: string | boolean): void;
 }
+export declare function httpError(statusCode: number, res: HtServerResponse, consoleMsg: any, userMsg?: string | boolean): boolean;
 export declare function httpError(statusCode: number, res: ServerResponse, consoleMsg: any, userMsg?: string | boolean): boolean;
 export declare const addon: {
     parseCookie: (ar: string[] | undefined | string) => {
         [key: string]: string;
+        [key: number]: string;
     };
     rmStrangeStr: (str: string) => string;
 };

@@ -13,7 +13,7 @@ function wildcard2Regexp(str:string):RegExp{
         }).join('')+'$')
 }
 
-type HttptreePathCallback<T> = ($$:HttptreePath<T>, req:HtIncomingMessage,res:HtServerResponse, data:object, option:T)=>any
+type HttptreePathCallback<T> = (req:HtIncomingMessage,res:HtServerResponse, data:any, option:T)=>any
 export class HttptreePath<T>{
     // protected option:T
     protected subpath:string
@@ -40,20 +40,20 @@ export class HttptreePath<T>{
     public p(subpath:string|RegExp):HttptreePath<T>{return this.path(subpath)}
     public path(subpath:string|RegExp):HttptreePath<T>{
         if(typeof subpath == 'string') subpath = subpath.replace(/\\/g,'/').replace(/$\//,'')
-        if(this.subpathList[String(subpath)]!==undefined) throw('Already set')
+        if(this.subpathList[String(subpath)]!==undefined) return this.subpathList[String(subpath)].p
         const $$ = new HttptreePath<T>(String(subpath))
         this.subpathList[String(subpath)] = {p:$$,r:(typeof subpath == 'string'? wildcard2Regexp(subpath):subpath)}
         return $$
     }
     
 
-    public get(callback:HttptreePathCallback<T>){if(this.getFn!==null) throw("Already set"); this.getFn = callback;}
-    public head(callback:HttptreePathCallback<T>){if(this.headFn!==null) throw("Already set"); this.headFn = callback;}
-    public post(callback:HttptreePathCallback<T>){if(this.postFn!==null) throw("Already set"); this.postFn = callback;}
-    public put(callback:HttptreePathCallback<T>){if(this.putFn!==null) throw("Already set"); this.putFn = callback;}
-    public delete(callback:HttptreePathCallback<T>){if(this.deleteFn!==null) throw("Already set"); this.deleteFn = callback;}
+    public get   (callback:HttptreePathCallback<T>){/*if(this.getFn   !==null) throw("Already set"); */this.getFn = callback;}
+    public head  (callback:HttptreePathCallback<T>){/*if(this.headFn  !==null) throw("Already set"); */this.headFn = callback;}
+    public post  (callback:HttptreePathCallback<T>){/*if(this.postFn  !==null) throw("Already set"); */this.postFn = callback;}
+    public put   (callback:HttptreePathCallback<T>){/*if(this.putFn   !==null) throw("Already set"); */this.putFn = callback;}
+    public delete(callback:HttptreePathCallback<T>){/*if(this.deleteFn!==null) throw("Already set"); */this.deleteFn = callback;}
     public method(methodName:string,callback:HttptreePathCallback<T>){
-        if(this.methodFns[methodName]!==undefined) throw("Already set");
+        if(this.methodFns[methodName]!==undefined) throw(`Already set in methodName: ${methodName}`);
         this.methodFns[methodName] = callback
     }
 
@@ -67,7 +67,7 @@ export class HttptreePath<T>{
         // console.log('[propagation]', pathName, pathnameList, 'pathnameL',pathnameL, 'pathnameF', pathnameF)
         if(pathnameF == '' ){
             const method = req.method?.toLocaleLowerCase()
-            if(!method) return httpError(400,res,`Invalid method, url:${req.url}`, 'Invalid method');
+            if(!method) return httpError(400,res,`Invalid method, url: ${req.url}`, 'Invalid method');
             const [HTreq, HTres] = [new HtIncomingMessage(req), new HtServerResponse(req,res)]
             if(method==='get'||method==='head'){
 
@@ -78,16 +78,17 @@ export class HttptreePath<T>{
                     if(tmp) out[hd]=tmp
                 }
                 // console.log(sp,out)
-                if(method=='get'&&this.getFn) this.getFn(this,HTreq,HTres,out,option)
-                else if(method=='head'&&this.headFn) this.headFn(this,HTreq,HTres,out,option)
+                if(method=='get'&&this.getFn) this.getFn(HTreq,HTres,out,option)
+                else if(method=='head'&&this.headFn) this.headFn(HTreq,HTres,out,option)
                 else return false
                 return true
             }
 
             const wrapfn = async (fn:HttptreePathCallback<T>)=>{
                 try{
-                    const data = post(req)
-                    fn(this, HTreq, HTres, data, option)
+                    const data = await post(req)
+                    const json = JSON.parse((data).toString())
+                    fn(HTreq, HTres, json, option)
                 }catch(e){
                     httpError(400, res, 'request body is wrong'+req.url, true)
                 }
@@ -100,6 +101,10 @@ export class HttptreePath<T>{
             else return false
             return true
         }
+        if(this.subpathList[pathnameF]){
+            const {p,r} = this.subpathList[pathnameF]
+            return p.propagation(req,res, option, pathnameL)
+        }
         for (const path in this.subpathList){
             const {p,r} = this.subpathList[path]
             if(r.test(pathnameF)) {
@@ -109,6 +114,17 @@ export class HttptreePath<T>{
         }
 
         return false
+    }
+
+    private copy(){
+        const $$ = new HttptreePath<T>(this.subpath)
+        $$.getFn = this.getFn
+        $$.postFn = this.postFn
+        $$.putFn = this.putFn
+        $$.deleteFn = this.deleteFn
+        $$.methodFns = this.methodFns
+        $$.subpathList = this.subpathList
+        return $$
     }
 }
 
@@ -123,7 +139,7 @@ export class Server<T> extends HttptreePath<T>{
             const subpath = (new URL('http://localhost'+req.url)).pathname
             return this.propagation(req,res,option, subpath)
         }catch(e){
-            return httpError(500,res,`Server request parse error, errmsg: ${e}, url:${req.url}`, false)
+            return httpError(500,res,`Server request parse error, errmsg: ${e}, url: ${req.url}`, false)
         }
         
     }
@@ -175,37 +191,49 @@ export class HtServerResponse{
     }
     
     set statusCode(statusCode:number){this.res.statusCode = statusCode}
+    get statusCode(){return this.res.statusCode}
     getHeader(name: string): string | number | string[] | undefined {return this.res.getHeader(name)}
     removeHeader(name: string): void {this.res.removeHeader(name)}
     set statusMessage(msg:string){this.res.statusMessage = msg}
 
     send(data:Buffer|string|object):void{
+        if(this.statusCode === undefined) this.statusCode = 200
         if(typeof data == 'string' || data instanceof Buffer) this.res.end(data)
         else httpJSON(this.res.statusCode,this.res,data)
     }
 
     sendFile(filepath:string){
         sendFile(this.res, filepath, this.req.headers.range).catch(e=>{
-            return httpError(404, this.res, `File not exist in path, ${this.req.url}, file:${filepath}`,"File not exist")
+            return httpError(404, this.res, `File not exist in path, ${this.req.url}, file: ${filepath}`,"File not exist")
         })
+    }
+    throw(statusCode:number,msg:string, userMsg:string|boolean){
+        console.error(`[${statusCode}] throw error, msg: ${msg}`)
+        httpError(statusCode, this.res, '', userMsg);
     }
 }
 
 
-export function httpError(statusCode:number,res:ServerResponse, consoleMsg:any, userMsg:string|boolean=false):boolean{
+export function httpError(statusCode:number,res:HtServerResponse, consoleMsg:any, userMsg?:string|boolean):boolean;
+export function httpError(statusCode:number,res:ServerResponse, consoleMsg:any, userMsg?:string|boolean):boolean;
+export function httpError(statusCode:number,res:HtServerResponse|ServerResponse, consoleMsg:any, userMsg:string|boolean=false):boolean{
     try{
         const httpStatusList:{[key:number]:string}={
             400:'Bad Request',
             403:'Forbidden',
             404:'Not Found'
         }
-        if(!Number.isInteger(statusCode)|| statusCode<=0) throw(`Invalid stateCode, code:${statusCode}`)
+        if(!Number.isInteger(statusCode)|| statusCode<=0) throw(`Invalid stateCode, code: ${statusCode}`)
         console.log(`[${statusCode}]`,consoleMsg, userMsg)
-        httpJSON(statusCode, res,{
+        res.statusCode = statusCode
+        const out = {
             stateCode: statusCode,
             explain:httpStatusList[statusCode],
             msg:(typeof userMsg === 'string' ? userMsg : (userMsg? consoleMsg: ''))
-        })
+        }
+
+        if(res instanceof HtServerResponse)  res.send(out)
+        else httpJSON(statusCode, res,out)
         return true
     }catch(e){
         console.error('[err0r httpError]',e)
@@ -237,7 +265,7 @@ export const addon = {
         if(typeof ar == 'string') ar = ar.split(';').map(v=>v.trim())
         if(!ar) return {}
     
-        const out:{[key:string]:string} = {}
+        const out:{[key:string|number]:string} = {}
         for(const d of ar){
             const dd = d.split(';')[0]
             const ddd = dd.split('=')
