@@ -14,7 +14,7 @@ function wildcard2Regexp(str:string):RegExp{
         }).join('')+'$')
 }
 
-type HttptreePathCallback<T> = (req:HtIncomingMessage,res:HtServerResponse, data:any, option:T)=>any
+type HttptreePathCallback<T> = (req:HtIncomingMessage,res:HtServerResponse, option:T)=>any
 export class HttptreePath<T>{
     // protected option:T
     protected subpath:string
@@ -25,6 +25,7 @@ export class HttptreePath<T>{
     private headFn: HttptreePathCallback<T>|null
     private postFn: HttptreePathCallback<T>|null
     private putFn: HttptreePathCallback<T>|null
+    private patchFn: HttptreePathCallback<T>|null
     private deleteFn: HttptreePathCallback<T>|null
     constructor(subpath:string=''){
         this.subpath = subpath
@@ -33,6 +34,7 @@ export class HttptreePath<T>{
         this.headFn = null
         this.postFn = null
         this.putFn = null
+        this.patchFn = null
         this.deleteFn = null
         this.subpathList = {}
         this.methodFns = {}
@@ -52,13 +54,14 @@ export class HttptreePath<T>{
     public head  (callback:HttptreePathCallback<T>){/*if(this.headFn  !==null) throw("Already set"); */this.headFn = callback;}
     public post  (callback:HttptreePathCallback<T>){/*if(this.postFn  !==null) throw("Already set"); */this.postFn = callback;}
     public put   (callback:HttptreePathCallback<T>){/*if(this.putFn   !==null) throw("Already set"); */this.putFn = callback;}
+    public patch (callback:HttptreePathCallback<T>){/*if(this.patchFn !==null) throw("Already set"); */this.patchFn = callback;}
     public delete(callback:HttptreePathCallback<T>){/*if(this.deleteFn!==null) throw("Already set"); */this.deleteFn = callback;}
     public method(methodName:string,callback:HttptreePathCallback<T>){
         if(this.methodFns[methodName]!==undefined) throw(`Already set in methodName: ${methodName}`);
         this.methodFns[methodName] = callback
     }
 
-    protected propagation(req:IncomingMessage,res:ServerResponse, option:T, pathName:string):boolean{
+    protected propagation(req:IncomingMessage,res:ServerResponse, option:T, pathName:string, testedPath:string=''):boolean{
         
         pathName = pathName.replace(/\\/g,'/').replace(/^\//,'')
         const pathnameList = pathName.split('/')
@@ -67,37 +70,32 @@ export class HttptreePath<T>{
 
         // console.log('[propagation]', pathName, pathnameList, 'pathnameL',pathnameL, 'pathnameF', pathnameF)
         if(pathnameF == '' ){
-            const method = req.method?.toLocaleLowerCase()
+            const method = req.method?.toUpperCase()
+            console.log('me',method)
             if(!method) return httpError(400,res,`Invalid method, url: ${req.url}`, 'Invalid method');
-            const [HTreq, HTres] = [new HtIncomingMessage(req), new HtServerResponse(req,res)]
-            if(method==='get'||method==='head'){
+            const [HTreq, HTres] = [new HtIncomingMessage(req, testedPath), new HtServerResponse(req,res)]
 
-                const out:{[key:string]:string} = {};
-                const sp = (new URL('https://localhost'+req.url)).searchParams
-                for(const hd of sp.keys()) {
-                    const tmp = sp.get(hd)
-                    if(tmp) out[hd]=tmp
-                }
-                // console.log(sp,out)
-                if(method=='get'&&this.getFn) this.getFn(HTreq,HTres,out,option)
-                else if(method=='head'&&this.headFn) this.headFn(HTreq,HTres,out,option)
+            if(method=='GET'||method=='HEAD'){
+                if(method=='GET'&&this.getFn) {this.getFn(HTreq,HTres,option); return true}
+                else if(method=='HEAD'&&this.headFn) {this.headFn(HTreq,HTres,option); return true}
                 else return false
-                return true
             }
+            
 
             const wrapfn = async (fn:HttptreePathCallback<T>)=>{
                 try{
-                    const data = await post(req)
-                    const json = JSON.parse((data).toString())
-                    fn(HTreq, HTres, json, option)
+                    HTreq.rawBody = await post(req)
+                    // const json = JSON.parse((data).toString())
+                    fn(HTreq, HTres, option)
                 }catch(e){
                     httpError(400, res, 'request body is wrong'+e+req.url, 'request body is wrong'+req.url)
                 }
             }
 
-            if(this.postFn && method=='post') wrapfn(this.postFn)
-            else if(this.putFn && method=='put') wrapfn(this.putFn)
-            else if(this.deleteFn && method=='delete') wrapfn(this.deleteFn)
+            if(this.postFn && method=='POST') wrapfn(this.postFn)
+            else if(this.putFn && method=='PUT') wrapfn(this.putFn)
+            else if(this.patchFn && method=='PATCH') wrapfn(this.patchFn)
+            else if(this.deleteFn && method=='DELETE') wrapfn(this.deleteFn)
             else if(this.methodFns[method]) wrapfn(this.methodFns[method])
             else return false
             return true
@@ -109,7 +107,7 @@ export class HttptreePath<T>{
         for (const path in this.subpathList){
             const {p,r} = this.subpathList[path]
             if(r.test(pathnameF)) {
-                return p.propagation(req,res, option, pathnameL)
+                return p.propagation(req,res, option, pathnameL, pathnameF)
             }
 
         }
@@ -121,6 +119,7 @@ export class HttptreePath<T>{
         $$.getFn = this.getFn
         $$.postFn = this.postFn
         $$.putFn = this.putFn
+        $$.patchFn = this.patchFn
         $$.deleteFn = this.deleteFn
         $$.methodFns = this.methodFns
         $$.subpathList = this.subpathList
@@ -134,11 +133,12 @@ export class HttptreePath<T>{
         const endchr = end?'└─':'├─'
         //const dt = (new Array(d)).fill(tab).join('')
         console.log(dt+endchr+`${"\x1b[32m"}"${this.subpath}"${"\x1b[0m"}`)
-        if(this.getFn) console.log(dt+hd+bt,'get',this.getFn)
-        if(this.headFn) console.log(dt+hd+bt,'head',this.headFn)
-        if(this.postFn) console.log(dt+hd+bt,'post',this.postFn)
-        if(this.putFn) console.log(dt+hd+bt,'put',this.putFn)
-        if(this.deleteFn) console.log(dt+hd+bt,'delete',this.deleteFn)
+        if(this.getFn) console.log(dt+hd+bt,'GET',this.getFn)
+        if(this.headFn) console.log(dt+hd+bt,'HEAD',this.headFn)
+        if(this.postFn) console.log(dt+hd+bt,'POST',this.postFn)
+        if(this.putFn) console.log(dt+hd+bt,'PUT',this.putFn)
+        if(this.patchFn) console.log(dt+hd+bt,'PATCH',this.patchFn)
+        if(this.deleteFn) console.log(dt+hd+bt,'DELETC',this.deleteFn)
         for(const method in this.methodFns) console.log(dt+hd+bt,`${method}:`,this.methodFns[method])
         const keyList = []
         for(const subpath in this.subpathList) keyList.push(subpath)
@@ -178,7 +178,7 @@ export class Server<T> extends HttptreePath<T>{
 
 async function post(req:IncomingMessage):Promise<Buffer> {
     return new Promise((resolve,rejects)=>{
-        const data:any[] = [];
+        const data:Buffer[] = [];
         req.on('error', () => { rejects('error in post') });
         req.on('data', (chunk) => { data.push(chunk) });
         req.on('end', () => { resolve(Buffer.concat(data)) });

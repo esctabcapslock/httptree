@@ -3,7 +3,9 @@ import { IncomingMessage, OutgoingHttpHeader, OutgoingHttpHeaders, ServerRespons
 export declare class HtIncomingMessage {
     private req;
     private __url;
-    constructor(req: IncomingMessage);
+    rawBody: null | Buffer;
+    testedSubPath: string;
+    constructor(req: IncomingMessage, testedSubPath: string);
     get complete(): boolean;
     destroy(error?: Error | undefined): IncomingMessage;
     get headers(): import("http").IncomingHttpHeaders;
@@ -11,6 +13,11 @@ export declare class HtIncomingMessage {
     get method(): string;
     get httpVersion(): string;
     get rawHeaders(): string[];
+    get lastSubPath(): string | undefined;
+    get urlParms(): {
+        [key: string]: string;
+    };
+    body(type?: "json" | "string" | "raw"): any;
 }
 export declare class HtServerResponse {
     private req;

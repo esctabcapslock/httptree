@@ -7,15 +7,16 @@ const hp = new httptree.Server()
 const port = 3000
 
 // add get methon in '/' path
-hp.get((req,res,data,obj)=>{ 
+hp.get((req,res,obj)=>{ 
     console.log('res / ans',res.statusCode)
     res.send('<a href="#">hello httptree!!</a>')
 })
-hp.path('index.html').get((req,res,data,obj)=>{
+
+hp.path('index.html').get((req,res,obj)=>{
 
     // Existing functions inside  http module can be used.
     res.setHeader('Access-Control-Allow-Origin','*')
-    console.log('res index.html',res.statusCode, data)
+    console.log('res index.html',res.statusCode)
     res.sendFile(__dirname+'\\index.html')
 })
 

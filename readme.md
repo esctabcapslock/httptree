@@ -8,7 +8,7 @@ Web framework to make [http] and [https] modules easier to use
 ## Feature
 - Referred to [express](express), excellent  web framework 
 - Created for use in my some another project
-- Modularization of server processing logic
+- Modularization of server Routing logic
 
 ## Usage
 - A small example of running a server ([also check this](./example/example.js))

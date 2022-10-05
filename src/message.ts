@@ -4,19 +4,53 @@ import { sendFile } from "./file";
 export class HtIncomingMessage{
     private req:IncomingMessage
     private __url:string
-    constructor(req:IncomingMessage){
+    public rawBody:null|Buffer
+    public testedSubPath:string
+    constructor(req:IncomingMessage, testedSubPath:string){
         if(req.url===undefined) throw('Invalid url')
         if(req.method===undefined) throw('Invalid method')
         this.req = req
         this.__url = req.url
+        this.rawBody = null
+        this.testedSubPath = testedSubPath
     }
     get complete():boolean{return this.req.complete}
     destroy(error?: Error | undefined): IncomingMessage {return this.req.destroy(error)}
     get headers(){return this.req.headers}
     get url():string{return this.__url}
-    get method():string{return this.method}
+    get method():string{return `${this.req.method}`}
     get httpVersion(){return this.req.httpVersion}
     get rawHeaders(){return this.req.rawHeaders}
+    get lastSubPath(){
+        const d = this.__url.split('?')[0].match(/[^/]+$/)
+        if(d) return d[0]
+        else this.__url.split('?')[0].replace(/$\//,'')
+    }
+    get urlParms(){
+        const out:{[key:string]:string} = {};
+        const sp = (new URL('https://localhost'+this.__url)).searchParams
+        for(const hd of sp.keys()) {
+            const tmp = sp.get(hd)
+            if(tmp) out[hd]=tmp
+        }
+        return out
+    }
+    public body(type:"json"|"string"|"raw"="json"){
+        if(type=="raw") return this.rawBody
+        if (this.method=='GET'||this.method=='HEAD') return null
+        if(!this.rawBody) return null
+        const str = (this.rawBody).toString();
+
+        switch (type){
+            case "json":
+                if(!this.rawBody) return null
+                try{return JSON.parse(str)}
+                catch {return null}
+            case 'string': return str
+            default: return null
+        }
+    }
+    
 }
 
 
@@ -78,7 +112,7 @@ export function httpError(statusCode:number,res:HtServerResponse|ServerResponse,
         console.log(`[${statusCode}]`,consoleMsg, userMsg)
         res.statusCode = statusCode
         const out = {
-            stateCode: statusCode,
+            statusCode: statusCode,
             explain:httpStatusList[statusCode],
             msg:(typeof userMsg === 'string' ? userMsg : (userMsg? consoleMsg: ''))
         }
