@@ -138,7 +138,7 @@ export class HttptreePath<T>{
         if(this.postFn) console.log(dt+hd+bt,'POST',this.postFn)
         if(this.putFn) console.log(dt+hd+bt,'PUT',this.putFn)
         if(this.patchFn) console.log(dt+hd+bt,'PATCH',this.patchFn)
-        if(this.deleteFn) console.log(dt+hd+bt,'DELETC',this.deleteFn)
+        if(this.deleteFn) console.log(dt+hd+bt,'DELETE',this.deleteFn)
         for(const method in this.methodFns) console.log(dt+hd+bt,`${method}:`,this.methodFns[method])
         const keyList = []
         for(const subpath in this.subpathList) keyList.push(subpath)
@@ -200,7 +200,15 @@ export const addon = {
         return out
     },
     rmStrangeStr:(str:string)=> // Remove Strange Characters
-        str.replace(/[\u0000-\u0008]|\u200b|[\u0e00-\u0e7f]|[\u0E80–\u0EFF]/gi,'').replace(/\s{2,}/,' ').trim(),
+        str.replace(/[\u0000-\u0008]|\u200b|[\u0e00-\u0e7f]|[\u0E80–\u0EFF]/gi,'').replace(/\s{2,}/,' ').trim()
+    // parseQuery:(queryString:string)=>{
+    //     const query = {} as {[key:string]:string};
+    //     (queryString[0] === '?' ? queryString.substr(1) : queryString).split('&').forEach(pair=>{
+    //         const data = pair.split('=')
+    //         query[decodeURIComponent(data[0])] = decodeURIComponent(data[1] || '');
+    //     });
+    //     return query;
+    // }
 
 }
 

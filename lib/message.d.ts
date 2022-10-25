@@ -17,7 +17,7 @@ export declare class HtIncomingMessage {
     get urlParms(): {
         [key: string]: string;
     };
-    body(type?: "json" | "string" | "raw"): any;
+    body(type?: "json" | "string" | "raw" | "querystring"): any;
 }
 export declare class HtServerResponse {
     private req;

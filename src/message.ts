@@ -1,5 +1,6 @@
 import { IncomingMessage, OutgoingHttpHeader, OutgoingHttpHeaders, ServerResponse } from "http"
 import { sendFile } from "./file";
+import querystring from 'querystring';
 
 export class HtIncomingMessage{
     private req:IncomingMessage
@@ -35,7 +36,7 @@ export class HtIncomingMessage{
         }
         return out
     }
-    public body(type:"json"|"string"|"raw"="json"){
+    public body(type:"json"|"string"|"raw"|"querystring"="json"){
         if(type=="raw") return this.rawBody
         if (this.method=='GET'||this.method=='HEAD') return null
         if(!this.rawBody) return null
@@ -46,6 +47,7 @@ export class HtIncomingMessage{
                 if(!this.rawBody) return null
                 try{return JSON.parse(str)}
                 catch {return null}
+            case 'querystring': return querystring.parse(str)
             case 'string': return str
             default: return null
         }
