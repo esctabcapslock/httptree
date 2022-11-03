@@ -2,7 +2,8 @@ import {ServerResponse, IncomingMessage, OutgoingHttpHeaders, createServer, Inco
 
 import { HtIncomingMessage, HtServerResponse, httpError } from "./message";
 
-
+const PayloadMaxSize = 2**32 // 4GB
+const UrlMaxSize = 1024 // 1014
 
 function wildcard2Regexp(str:string):RegExp{
     return new RegExp('^'+str.split("").map(c=>{
@@ -14,7 +15,19 @@ function wildcard2Regexp(str:string):RegExp{
         }).join('')+'$')
 }
 
-type HttptreePathCallback<T> = (req:HtIncomingMessage,res:HtServerResponse, option:T)=>any
+interface OptionOfHttptreePath{
+    payloadMaxSize?:number,
+    urlMaxSize?:number
+}
+
+type HttptreePathCallback<T> = 
+    ((req:HtIncomingMessage,res:HtServerResponse, option:T)=>void)|
+    ((req:HtIncomingMessage,res:HtServerResponse, option:T)=>Promise<void>)
+
+type HttptreeErrorCallback<T> = 
+    ((req:HtIncomingMessage,res:HtServerResponse, option:T, error:any)=>void)|
+    ((req:HtIncomingMessage,res:HtServerResponse, option:T, error:any)=>Promise<void>)
+
 export class HttptreePath<T>{
     // protected option:T
     protected subpath:string
@@ -27,7 +40,10 @@ export class HttptreePath<T>{
     private putFn: HttptreePathCallback<T>|null
     private patchFn: HttptreePathCallback<T>|null
     private deleteFn: HttptreePathCallback<T>|null
-    constructor(subpath:string=''){
+    protected errorFn: HttptreeErrorCallback<T>|null
+    public payloadMaxSize:number
+    public urlMaxSize:number
+    constructor(subpath:string='', option:OptionOfHttptreePath={}){
         this.subpath = subpath
         this.showerror = true
         this.getFn = null
@@ -36,32 +52,36 @@ export class HttptreePath<T>{
         this.putFn = null
         this.patchFn = null
         this.deleteFn = null
+        this.errorFn = null
         this.subpathList = {}
         this.methodFns = {}
+        this.payloadMaxSize = option.payloadMaxSize?option.payloadMaxSize:PayloadMaxSize // limit size of Payload
+        this.urlMaxSize = option.urlMaxSize?option.urlMaxSize:UrlMaxSize // limit size of Payload
     }
 
-    public p(subpath:string|RegExp):HttptreePath<T>{return this.path(subpath)}
-    public path(subpath:string|RegExp):HttptreePath<T>{
+    public p(subpath:string|RegExp, option:OptionOfHttptreePath={}):HttptreePath<T>{return this.path(subpath, option)}
+    public path(subpath:string|RegExp, option:OptionOfHttptreePath={}):HttptreePath<T>{
         if(typeof subpath == 'string') subpath = subpath.replace(/\\/g,'/').replace(/$\//,'')
         if(this.subpathList[String(subpath)]!==undefined) return this.subpathList[String(subpath)].p
-        const $$ = new HttptreePath<T>(String(subpath))
+        const $$ = new HttptreePath<T>(String(subpath), option)
         this.subpathList[String(subpath)] = {p:$$,r:(typeof subpath == 'string'? wildcard2Regexp(subpath):subpath)}
         return $$
     }
     
 
-    public get   (callback:HttptreePathCallback<T>){/*if(this.getFn   !==null) throw("Already set"); */this.getFn = callback;}
-    public head  (callback:HttptreePathCallback<T>){/*if(this.headFn  !==null) throw("Already set"); */this.headFn = callback;}
-    public post  (callback:HttptreePathCallback<T>){/*if(this.postFn  !==null) throw("Already set"); */this.postFn = callback;}
-    public put   (callback:HttptreePathCallback<T>){/*if(this.putFn   !==null) throw("Already set"); */this.putFn = callback;}
-    public patch (callback:HttptreePathCallback<T>){/*if(this.patchFn !==null) throw("Already set"); */this.patchFn = callback;}
-    public delete(callback:HttptreePathCallback<T>){/*if(this.deleteFn!==null) throw("Already set"); */this.deleteFn = callback;}
+    public get   (callback:HttptreePathCallback<T>){if(this.getFn   !==null) throw("Already set"); this.getFn = callback;}
+    public head  (callback:HttptreePathCallback<T>){if(this.headFn  !==null) throw("Already set"); this.headFn = callback;}
+    public post  (callback:HttptreePathCallback<T>){if(this.postFn  !==null) throw("Already set"); this.postFn = callback;}
+    public put   (callback:HttptreePathCallback<T>){if(this.putFn   !==null) throw("Already set"); this.putFn = callback;}
+    public patch (callback:HttptreePathCallback<T>){if(this.patchFn !==null) throw("Already set"); this.patchFn = callback;}
+    public delete(callback:HttptreePathCallback<T>){if(this.deleteFn!==null) throw("Already set"); this.deleteFn = callback;}
+    public catch(callback:HttptreeErrorCallback<T>){if(this.deleteFn!==null) throw("Already set"); this.errorFn = callback;}
     public method(methodName:string,callback:HttptreePathCallback<T>){
         if(this.methodFns[methodName]!==undefined) throw(`Already set in methodName: ${methodName}`);
         this.methodFns[methodName] = callback
     }
 
-    protected propagation(req:IncomingMessage,res:ServerResponse, option:T, pathName:string, testedPath:string=''):boolean{
+    protected async propagation(req:IncomingMessage,res:ServerResponse, option:T, pathName:string, testedPath:string=''):Promise<boolean>{
         
         pathName = pathName.replace(/\\/g,'/').replace(/^\//,'')
         const pathnameList = pathName.split('/')
@@ -69,45 +89,60 @@ export class HttptreePath<T>{
         const pathnameF = pathnameList[0]
 
         // console.log('[propagation]', pathName, pathnameList, 'pathnameL',pathnameL, 'pathnameF', pathnameF)
-        if(pathnameF == '' ){
+        // if(pathnameF == '' ){
+
+        const propagationError = async (fn:Function)=>{
+            try{
+                return await fn()
+            }catch(err){
+                const [HTreq, HTres] = [new HtIncomingMessage(req, testedPath), new HtServerResponse(req,res)]
+                if (this.errorFn) this.errorFn(HTreq,HTres, option, err)
+                else throw(err)
+            }
+
+        }
+
+
+        if(this.getFn||this.headFn||this.postFn||this.patchFn||this.putFn||this.deleteFn){
             const method = req.method?.toUpperCase()
-            console.log('me',method)
+            // console.log('me',method)
             if(!method) return httpError(400,res,`Invalid method, url: ${req.url}`, 'Invalid method');
             const [HTreq, HTres] = [new HtIncomingMessage(req, testedPath), new HtServerResponse(req,res)]
 
-            if(method=='GET'||method=='HEAD'){
-                if(method=='GET'&&this.getFn) {this.getFn(HTreq,HTres,option); return true}
-                else if(method=='HEAD'&&this.headFn) {this.headFn(HTreq,HTres,option); return true}
-                else return false
-            }
+
             
 
-            const wrapfn = async (fn:HttptreePathCallback<T>)=>{
-                try{
-                    HTreq.rawBody = await post(req)
-                    // const json = JSON.parse((data).toString())
-                    fn(HTreq, HTres, option)
-                }catch(e){
-                    httpError(400, res, 'request body is wrong'+e+req.url, 'request body is wrong'+req.url)
-                }
+            const wrapfn = async (fn:HttptreePathCallback<T>, hasBody:boolean)=>{
+                await propagationError(async ()=>{
+                    try{
+                        if(hasBody) HTreq.rawBody = await post(req, this.payloadMaxSize)
+                    }catch(e){
+                        return httpError(413, res, 'Payload Too Large'+e+req.url, 'Payload Too Large')
+                    }
+
+                    await fn(HTreq, HTres, option)
+                })
             }
 
-            if(this.postFn && method=='POST') wrapfn(this.postFn)
-            else if(this.putFn && method=='PUT') wrapfn(this.putFn)
-            else if(this.patchFn && method=='PATCH') wrapfn(this.patchFn)
-            else if(this.deleteFn && method=='DELETE') wrapfn(this.deleteFn)
-            else if(this.methodFns[method]) wrapfn(this.methodFns[method])
+
+            if(method=='GET'&&this.getFn)              await wrapfn(this.getFn, false)
+            else if(method=='HEAD'&&this.headFn)       await wrapfn(this.headFn, false)
+            else if(this.postFn && method=='POST')     await wrapfn(this.postFn,true)
+            else if(this.putFn && method=='PUT')       await wrapfn(this.putFn,true)
+            else if(this.patchFn && method=='PATCH')   await wrapfn(this.patchFn,true)
+            else if(this.deleteFn && method=='DELETE') await wrapfn(this.deleteFn,true)
+            else if(this.methodFns[method])            await wrapfn(this.methodFns[method],true)
             else return false
             return true
         }
         if(this.subpathList[pathnameF]){
             const {p,r} = this.subpathList[pathnameF]
-            return p.propagation(req,res, option, pathnameL)
+            return await propagationError(async ()=> await p.propagation(req,res, option, pathnameL))
         }
         for (const path in this.subpathList){
             const {p,r} = this.subpathList[path]
             if(r.test(pathnameF)) {
-                return p.propagation(req,res, option, pathnameL, pathnameF)
+                return await propagationError(async ()=> await p.propagation(req, res, option, pathnameL, pathnameF))
             }
 
         }
@@ -152,16 +187,29 @@ export class HttptreePath<T>{
 
 
 export class Server<T> extends HttptreePath<T>{
-    constructor(){
-        super();
+    constructor(subpath:string='', option:OptionOfHttptreePath={}){
+        super(subpath,option);
     }
 
-    public parse(req:IncomingMessage,res:ServerResponse, option:T):boolean{
+    public async parse(req:IncomingMessage,res:ServerResponse, option:T):Promise<boolean>{
+
+        if(req.url && req.url?.length>this.urlMaxSize) return httpError(414, res, `URI Too Long, url length: ${req.url.length}`, true)
+
         try{
             const subpath = (new URL('http://localhost'+req.url)).pathname
-            return this.propagation(req,res,option, subpath)
-        }catch(e){
-            return httpError(500,res,`Server request parse error, errmsg: ${e}, url: ${req.url}`, false)
+            return await this.propagation(req,res,option, subpath)
+        }catch(err){
+            if(this.errorFn) {
+                try{
+                    await this.errorFn(new HtIncomingMessage(req, '/'),new HtServerResponse(req,res), option, err)
+                }catch(e){
+                    httpError(500,res,`Server request parse error, errmsg: ${e}, url: ${req.url}`, false)
+                }finally{
+                    return true
+                }
+            }else{
+                return httpError(500,res,`Server request parse error, errmsg: ${err}, url: ${req.url}`, false)
+            }
         }
     }
 
@@ -176,11 +224,17 @@ export class Server<T> extends HttptreePath<T>{
     
 // }
 
-async function post(req:IncomingMessage):Promise<Buffer> {
+async function post(req:IncomingMessage, max_size:number=PayloadMaxSize):Promise<Buffer> {
     return new Promise((resolve,rejects)=>{
         const data:Buffer[] = [];
+        let size = 0
         req.on('error', () => { rejects('error in post') });
-        req.on('data', (chunk) => { data.push(chunk) });
+        req.on('data', (chunk) => { 
+            size+=chunk.length
+            if(size>max_size) throw('size off')
+            data.push(chunk)
+
+        });
         req.on('end', () => { resolve(Buffer.concat(data)) });
     })
 }
