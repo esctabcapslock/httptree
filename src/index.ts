@@ -96,14 +96,22 @@ export class HttptreePath<T>{
                 return await fn()
             }catch(err){
                 const [HTreq, HTres] = [new HtIncomingMessage(req, testedPath), new HtServerResponse(req,res)]
-                if (this.errorFn) this.errorFn(HTreq,HTres, option, err)
+                if (this.errorFn) {
+                    try{
+                        await this.errorFn(HTreq,HTres, option, err)
+                        return true
+                    }catch(e){
+                        throw(e)
+                    }
+                }
                 else throw(err)
             }
 
         }
 
 
-        if(this.getFn||this.headFn||this.postFn||this.patchFn||this.putFn||this.deleteFn){
+        // if(this.getFn||this.headFn||this.postFn||this.patchFn||this.putFn||this.deleteFn){
+        if(pathnameF == ''){
             const method = req.method?.toUpperCase()
             // console.log('me',method)
             if(!method) return httpError(400,res,`Invalid method, url: ${req.url}`, 'Invalid method');
