@@ -5,8 +5,8 @@ interface OptionOfHttptreePath {
     payloadMaxSize?: number;
     urlMaxSize?: number;
 }
-declare type HttptreePathCallback<T> = ((req: HtIncomingMessage, res: HtServerResponse, option: T) => void) | ((req: HtIncomingMessage, res: HtServerResponse, option: T) => Promise<void>);
-declare type HttptreeErrorCallback<T> = ((req: HtIncomingMessage, res: HtServerResponse, option: T, error: any) => void) | ((req: HtIncomingMessage, res: HtServerResponse, option: T, error: any) => Promise<void>);
+type HttptreePathCallback<T> = ((req: HtIncomingMessage, res: HtServerResponse, option: T) => void) | ((req: HtIncomingMessage, res: HtServerResponse, option: T) => Promise<void>);
+type HttptreeErrorCallback<T> = ((req: HtIncomingMessage, res: HtServerResponse, option: T, error: any) => void) | ((req: HtIncomingMessage, res: HtServerResponse, option: T, error: any) => Promise<void>);
 export declare class HttptreePath<T> {
     protected subpath: string;
     protected showerror: boolean;

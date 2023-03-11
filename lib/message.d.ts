@@ -1,4 +1,5 @@
 /// <reference types="node" />
+/// <reference types="node" />
 import { IncomingMessage, OutgoingHttpHeader, OutgoingHttpHeaders, ServerResponse } from "http";
 export declare class HtIncomingMessage {
     private req;
