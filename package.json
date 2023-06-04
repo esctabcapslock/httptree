@@ -1,6 +1,6 @@
 {
   "name": "httptree",
-  "version": "0.0.2",
+  "version": "0.0.2.1",
   "description": "Web framework to make http modules easier to use",
   "main": "index.js",
   "scripts": {
@@ -14,15 +14,13 @@
   },
   "homepage": "https://github.com/esctabcapslock/httptree",
   "devDependencies": {
-    "@types/node": "^18.0.3"
+    "@types/node": "^18.0.3",
+    "typescript": "^4.9.5"
   },
   "bugs": {
     "url": "https://github.com/esctabcapslock/httptree/issues"
   },
   "directories": {
     "example": "example"
-  },
-  "dependencies": {
-    "typescript": "^4.9.5"
   }
 }

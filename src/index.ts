@@ -150,6 +150,7 @@ export class HttptreePath<T>{
         for (const path in this.subpathList){
             const {p,r} = this.subpathList[path]
             if(r.test(pathnameF)) {
+                r.lastIndex = 0;
                 return await propagationError(async ()=> await p.propagation(req, res, option, pathnameL, pathnameF))
             }
 
